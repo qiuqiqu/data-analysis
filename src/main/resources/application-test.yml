@@ -1,5 +1,5 @@
 server:
-  port: 8101
+  port: 8080
 spring:
   # 数据库配置
   # todo 需替换配置
@@ -22,3 +22,8 @@ spring:
     uris: http://localhost:9200
     username: root
     password: GY
+#鱼AI配置
+#yuapi:
+#  client:
+#    access-key: 3vlq0eg46juwzly5pxo5tig4efwculvb
+#    secret-key: 6lgjy5t5qbxcxcs6ce54kw4x1dy02tre
