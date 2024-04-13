@@ -1,5 +1,6 @@
 package com.gy.springbootinit.controller;
 
+import cn.hutool.core.text.StrSplitter;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
@@ -9,12 +10,15 @@ import com.gy.springbootinit.common.DeleteRequest;
 import com.gy.springbootinit.common.ErrorCode;
 import com.gy.springbootinit.common.ResultUtils;
 import com.gy.springbootinit.constant.CommonConstant;
+import com.gy.springbootinit.constant.ModelId;
 import com.gy.springbootinit.constant.UserConstant;
 import com.gy.springbootinit.exception.BusinessException;
 import com.gy.springbootinit.exception.ThrowUtils;
+import com.gy.springbootinit.manager.AiManager;
 import com.gy.springbootinit.model.dto.chart.*;
 import com.gy.springbootinit.model.entity.Chart;
 import com.gy.springbootinit.model.entity.User;
+import com.gy.springbootinit.model.vo.BiResponse;
 import com.gy.springbootinit.service.ChartService;
 import com.gy.springbootinit.service.UserService;
 import com.gy.springbootinit.utils.ExcelUtils;
@@ -28,10 +32,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * 帖子接口
- *
  */
 @RestController
 @RequestMapping("/chart")
@@ -43,6 +47,9 @@ public class ChartController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AiManager aiManager;
 
     private final static Gson GSON = new Gson();
 
@@ -144,7 +151,7 @@ public class ChartController {
      */
     @PostMapping("/list/page")
     public BaseResponse<Page<Chart>> listChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-            HttpServletRequest request) {
+                                                     HttpServletRequest request) {
         long current = chartQueryRequest.getCurrent();
         long size = chartQueryRequest.getPageSize();
         // 限制爬虫
@@ -163,7 +170,7 @@ public class ChartController {
      */
     @PostMapping("/my/list/page")
     public BaseResponse<Page<Chart>> listMyChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-            HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         if (chartQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -208,7 +215,6 @@ public class ChartController {
     }
 
 
-
     /**
      * 智能分析
      *
@@ -220,20 +226,58 @@ public class ChartController {
     @PostMapping("/gen")
     public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
                                              GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
-        String name = genChartByAiRequest.getName();
-        String goal = genChartByAiRequest.getGoal();
+        String name = genChartByAiRequest.getName();//名称
+        String goal = genChartByAiRequest.getGoal();//分析目标
         String chartType = genChartByAiRequest.getChartType();
         // 校验
+        // 如果分析目标为空，就抛出请求参数错误异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
+        // 如果名称不为空，并且名称长度大于100，就抛出异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
-
+        //获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
         // 用户输入
+        /**
+         *               用户的输入(参考)
+         *               分析需求：
+         *               分析网站用户的增长情况
+         *               原始数据：
+         *               日期,用户数
+         *               1号,10
+         *               2号,20
+         *               3号,30
+         */
         StringBuilder userInput = new StringBuilder();
-        userInput.append("你是一个数据分析师，接下来我会给你我的分析目标和原始数据，请告诉我分析结论。").append("\n");
-        userInput.append("分析目标：").append(goal).append("\n");
-        // 压缩后的数据
-        String result = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append("数据：").append(result).append("\n");
+        userInput.append("分析需求").append("\n");
+        //拼接用户输入分析需求
+        String userGoal = goal;
+        if (chartType != null) {
+            // 就将分析目标拼接上“请使用”+图表类型
+            userGoal += "请使用" + chartType;
+        }
+        userInput.append(userGoal).append("\n");
+        //压缩用户转入的原始数据
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
+        userInput.append(csvData).append("\n");
+        //调用ai接口 返回数据结果
+        String result = aiManager.doChat(ModelId.AI_MODEL_ID, userInput.toString());
+        List<String> split = StrSplitter.split(result, "【【【【【", 0, true, true);
+        //将图表信息插入数据库
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setGenChart(split.get(0));
+        chart.setGenResult(split.get(1));
+        chart.setUserId(loginUser.getId());
+        boolean saveResult = chartService.save(chart);
+        //ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+        BiResponse biResponse = new BiResponse();
+        biResponse.setChatId(chart.getId());
+        biResponse.setGenChart(split.get(0));
+        biResponse.setGenResult(split.get(1));
+        
         return ResultUtils.success(userInput.toString());
     }
 

@@ -27,12 +27,6 @@ public class ExcelUtils {
      * @return
      */
     public static String excelToCsv(MultipartFile multipartFile) {
-//        File file = null;
-//        try {
-//            file = ResourceUtils.getFile("classpath:网站数据.xlsx");
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        }
         // 读取数据
         List<Map<Integer, String>> list = null;
         try {
@@ -62,7 +56,4 @@ public class ExcelUtils {
         return stringBuilder.toString();
     }
 
-    public static void main(String[] args) {
-        excelToCsv(null);
-    }
 }
