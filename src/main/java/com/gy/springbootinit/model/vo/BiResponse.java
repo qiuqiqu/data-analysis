@@ -9,7 +9,7 @@ public class BiResponse implements Serializable {
     /**
      *图标id
      */
-    private Long chatId;
+    private Long chartId;
 
     /**
      * 生成的图表数据

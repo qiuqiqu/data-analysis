@@ -224,7 +224,7 @@ public class ChartController {
      * @return
      */
     @PostMapping("/gen")
-    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+    public BaseResponse<BiResponse> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
                                              GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();//名称
         String goal = genChartByAiRequest.getGoal();//分析目标
@@ -262,23 +262,25 @@ public class ChartController {
         //调用ai接口 返回数据结果
         String result = aiManager.doChat(ModelId.AI_MODEL_ID, userInput.toString());
         List<String> split = StrSplitter.split(result, "【【【【【", 0, true, true);
+        String genChart=split.get(0).trim();
+        String genResult=split.get(1).trim();
         //将图表信息插入数据库
         Chart chart = new Chart();
         chart.setName(name);
         chart.setGoal(goal);
         chart.setChartData(csvData);
         chart.setChartType(chartType);
-        chart.setGenChart(split.get(0));
-        chart.setGenResult(split.get(1));
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
         chart.setUserId(loginUser.getId());
         boolean saveResult = chartService.save(chart);
-        //ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
         BiResponse biResponse = new BiResponse();
-        biResponse.setChatId(chart.getId());
-        biResponse.setGenChart(split.get(0));
-        biResponse.setGenResult(split.get(1));
-        
-        return ResultUtils.success(userInput.toString());
+        biResponse.setChartId(chart.getId());
+        biResponse.setGenChart(genChart);
+        biResponse.setGenResult(genResult);
+        return ResultUtils.success(biResponse);
     }
 
 
