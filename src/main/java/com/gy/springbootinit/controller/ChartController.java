@@ -1,5 +1,6 @@
 package com.gy.springbootinit.controller;
 
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.text.StrSplitter;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -32,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -229,7 +231,30 @@ public class ChartController {
         String name = genChartByAiRequest.getName();//名称
         String goal = genChartByAiRequest.getGoal();//分析目标
         String chartType = genChartByAiRequest.getChartType();
+
+        //获取文件大小
+        long fileSize = multipartFile.getSize();
+        //获取原始文件名称
+        String originalFilename = multipartFile.getOriginalFilename();
+        /**
+         * 获取文件扩展名
+         * test.txt =>  txt
+         */
+        String extName = FileUtil.extName(originalFilename);
+
+        /**
+         * 校验文件大小
+         *
+         * 定义一个常量 1MB
+         */
+        final long ONE_MB=1024*1024L;
+
         // 校验
+        //不是指定的文件后缀抛出异常
+        final List<String> extNameList = Arrays.asList("png", "jpg", "jpeg", "svg", "webp");
+        ThrowUtils.throwIf(extNameList.contains(extName),ErrorCode.PARAMS_ERROR,"文件后缀非法");
+        //如果文件大小超出1兆 抛出异常
+        ThrowUtils.throwIf(fileSize>ONE_MB,ErrorCode.PARAMS_ERROR,"文件超出 1M");
         // 如果分析目标为空，就抛出请求参数错误异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         // 如果名称不为空，并且名称长度大于100，就抛出异常，并给出提示
