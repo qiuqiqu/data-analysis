@@ -16,6 +16,7 @@ import com.gy.springbootinit.constant.UserConstant;
 import com.gy.springbootinit.exception.BusinessException;
 import com.gy.springbootinit.exception.ThrowUtils;
 import com.gy.springbootinit.manager.AiManager;
+import com.gy.springbootinit.manager.RedisLimiterManager;
 import com.gy.springbootinit.model.dto.chart.*;
 import com.gy.springbootinit.model.entity.Chart;
 import com.gy.springbootinit.model.entity.User;
@@ -52,6 +53,9 @@ public class ChartController {
 
     @Resource
     private AiManager aiManager;
+
+    @Resource
+    private RedisLimiterManager redisLimiterManager;
 
     private final static Gson GSON = new Gson();
 
@@ -259,8 +263,11 @@ public class ChartController {
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         // 如果名称不为空，并且名称长度大于100，就抛出异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+
         //获取当前登录用户
         User loginUser = userService.getLoginUser(request);
+        // 限流判断，每个用户一个限流器
+        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
         // 用户输入
         /**
          *               用户的输入(参考)
